@@ -1,0 +1,24 @@
+{
+  "name": "tcsattendance",
+  "version": "1.0.0",
+  "description": "Mark attendance on slack app home",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DenmarFel/TCSAttendance.git"
+  },
+  "author": "Denmar Feliciano",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/DenmarFel/TCSAttendance/issues"
+  },
+  "homepage": "https://github.com/DenmarFel/TCSAttendance#readme",
+  "dependencies": {
+    "@slack/bolt": "^2.3.0",
+    "dotenv": "^8.2.0",
+    "redis": "^3.0.2"
+  }
+}
