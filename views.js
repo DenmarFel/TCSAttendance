@@ -2,9 +2,6 @@
 const dotenv = require('dotenv');
 dotenv.config();
 
-// For making HTTP Requests
-const axios = require('axios');  
-
 function publishLoginView(app, token, user_id) {
   app.client.views.publish({
     token: token,
@@ -22,8 +19,7 @@ function publishLoginView(app, token, user_id) {
             "type": "button",
             "text": {
               "type": "plain_text",
-              "text": "Pike13 Verification",
-              "emoji": true
+              "text": "Pike13 Verification"
             },
             "action_id": "pike13verification",
             "url": `${process.env.PIKE13_URL}/oauth/authorize?client_id=${process.env.PIKE13_CLIENT_ID}&response_type=code&user_id=${user_id}&redirect_uri=${process.env.SERVER_URL}/callback`,
@@ -41,7 +37,12 @@ function getTodaysDate() {
   const month = today.getMonth() + 1; // January is 0
   const date = today.getDate();
   return `${year}-${month}-${date}`
+}
 
+function formatTime(time) {
+  let pos = 0
+  for (let i = 0; i < time.length; i++ ) { if (time[i] == ':') { pos = i; }}
+  return time.substring(0, pos).concat(time.substring(pos + 4, time.length).toLowerCase())
 }
 
 async function publishAttendanceView(app, slack_token, user_id, events, visits, people, date = getTodaysDate()) {
@@ -50,7 +51,7 @@ async function publishAttendanceView(app, slack_token, user_id, events, visits, 
   // console.log(events);
   // console.log(visits);
   // console.log(people);
-
+  // console.log(date);
   let view = {
     "type": "home",
     "blocks": [
@@ -62,6 +63,7 @@ async function publishAttendanceView(app, slack_token, user_id, events, visits, 
         },
         "accessory": {
           "type": "datepicker",
+          "action_id": "attendance_on_date",
           "initial_date": `${date}`,
           "placeholder": {
             "type": "plain_text",
@@ -77,38 +79,19 @@ async function publishAttendanceView(app, slack_token, user_id, events, visits, 
   }
 
   events.forEach((event) => {
-    // const event_header = {
-    //   "type": "header",
-    //   "text": {
-    //     "type": "plain_text",
-		// 		"text": `${event.name} (${new Date(event.start_at).toLocaleTimeString()}-${new Date(event.end_at).toLocaleTimeString()})`,
-    //   }
-    // }
-    // view.blocks.push(event_header);
+    let start = formatTime(new Date(event.start_at).toLocaleTimeString());
+    let end = formatTime(new Date(event.end_at).toLocaleTimeString());
+
+    const event_header = {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+				"text": `*<${process.env.PIKE13_URL}/e/${event.id}|${event.name} (${start}-${end})>*`,
+      }
+    }
+    view.blocks.push(event_header);
 
     event.people.forEach(person => {
-      const section = {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": `*${person.name}* _(${event.name} - ${new Date(event.start_at).toLocaleTimeString()}-${new Date(event.end_at).toLocaleTimeString()})_`,
-        }
-      }
-
-      let section_nums = {
-        "type": "section",
-        "fields": [
-          {
-            "type": "mrkdwn",
-            "text": "*Parent*"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Number*"
-          }
-        ]
-      }
-
       let person_providers;
       people.forEach(person_data => {
         if (person.id == person_data[0].id) { 
@@ -116,23 +99,78 @@ async function publishAttendanceView(app, slack_token, user_id, events, visits, 
         }
       })
 
+      let contacts = [];
       person_providers.forEach(provider => {
-        let provider_name = {
-          "type": "plain_text",
-          "text": `${provider.name}`
-        };
-        let provider_number = {
-          "type": "plain_text",
-          "text": (provider.phone) ? provider.phone : 'Unavailable'
+        if (provider.phone) {
+          contacts.push(`${provider.name} (${provider.phone.substring(0,3)}) ${provider.phone.substring(3,6)}-${provider.phone.substring(6,10)}`)
+        } else {
+          constats.push(`${provider.name} _(Unavailable)_`)
         }
-        section_nums.fields.push(provider_name);
-        section_nums.fields.push(provider_number);
+      }) 
+
+      const student = {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": `>*Student:* ${person.name}\n>*Guardian:* ${contacts.join(', ')}`,
+        }
+      }
+      view.blocks.push(student);
+
+      let person_visit;
+      visits.forEach(visit => {
+        visit.forEach(individual_visit => {
+          if (person.id == individual_visit.person_id && event.id == individual_visit.event_occurrence_id) {
+            person_visit = individual_visit;
+            console.log(JSON.stringify(person_visit, null, 2));
+          }
+        })
       })
-
-
-
-      view.blocks.push(section);
-      view.blocks.push(section_nums);
+      
+      if (person_visit.completed_at == null && person_visit.noshow_at == null) {
+        buttons = {
+          "type": "actions",
+          "elements": [
+            {
+              "type": "button",
+              "text": {
+                "type": "plain_text",
+                "text": "Present"
+              },
+              "style": "primary",
+              "action_id": "student_present",
+              "value": `${person_visit.id}/${person_visit.person_id}/${date}`
+            },
+            {
+              "type": "button",
+              "text": {
+                "type": "plain_text",
+                "text": "No Show"
+              },
+              "action_id": "student_no_show",
+              "value": `${person_visit.id}/${person_visit.person_id}/${date}`
+            }
+          ]
+        }
+      } else {
+        buttons = {
+          "type": "actions",
+          "elements": [
+            {
+              "type": "button",
+              "text": {
+                "type": "plain_text",
+                "text": "Reset Attendance"
+              },
+              "style": "danger",
+              "action_id": "student_reset",
+              "value": `${person_visit.id}/${person_visit.person_id}/${date}`
+            }
+          ]
+        }
+      }
+      
+      view.blocks.push(buttons);
     });
 
     const divider = {

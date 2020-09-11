@@ -17,21 +17,39 @@ function getUser(app, token, user) {
 
 function getAuthCode(client, user_id) {
   return client.hget('pike13users', user_id, (error, auth_code) => {
-    if (error) throw err;
+    if (error) throw error;
     return auth_code;
   })
 }
 
-function getTodaysDate() {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth() + 1; // January is 0
-  const date = today.getDate();
-  return `${year}-${month}-${date}`
+function storePikeCredentials(request, client, user_id, user) {
+  // Grabs Pike13 access_token to store in redis
+  axios.post(`${process.env.PIKE13_URL}/oauth/token?`, null, { params: {
+    grant_type: 'authorization_code',
+    code: request.query['code'],
+    redirect_uri: `${process.env.SERVER_URL}/callback`,
+    client_id: process.env.PIKE13_CLIENT_ID,
+    client_secret: process.env.PIKE13_CLIENT_SECRET
+  }})
+  .then(response => {
+    const access_token = response.data.access_token;
+    client.hset('pike13users', [user_id, access_token]);
 
+    // Grabs Pike13 staff_id to store in redis
+    axios.get(`${process.env.PIKE13_URL}/api/v2/desk/staff_members?`, { params: {
+      access_token: access_token
+    }})
+    .then(response => {
+      const staff_member = response.data.staff_members.filter(s => s.email == user.user.profile.email)[0];
+      client.hset('pike13staff_id', [user_id, staff_member.id])
+    })
+  })
+  .catch(error => {
+    console.log(error);
+  });
 }
 
-function getAttendanceViewDataAndPublishView(client, app, bot_token, user_id, start = new Date().setHours(0,0,0,0), end = new Date().setHours(23,59,59,999)) {
+function getAttendanceViewDataAndPublishView(client, app, bot_token, user_id, start = new Date(new Date().setHours(0,0,0,0)), end = new Date(new Date().setHours(23,59,59,999))) {
   // Grabs Pike13 access_token
   client.hget('pike13users', user_id , (error, access_token) => {
     if (error) throw error;
@@ -43,7 +61,9 @@ function getAttendanceViewDataAndPublishView(client, app, bot_token, user_id, st
       // API Call to grab all event occurrences
       axios.get(`${process.env.PIKE13_URL}/api/v2/desk/event_occurrences?`, { params: {
         access_token: access_token,
-        staff_member_ids: staff_id
+        staff_member_ids: staff_id,
+        from: start,
+        to: end
       }})
       .then(response => {
 
@@ -73,8 +93,6 @@ function getAttendanceViewDataAndPublishView(client, app, bot_token, user_id, st
           })
         })
 
-        
-
         Promise.all(visit_promises).then(values => {
           let visits = []
           values.forEach(value => {
@@ -87,10 +105,9 @@ function getAttendanceViewDataAndPublishView(client, app, bot_token, user_id, st
               people.push(value.data.people);
             })
 
-            views.publishAttendanceView(app, bot_token, user_id, events, visits, people);
+            let date = `${start.getFullYear()}-${start.getMonth() + 1}-${start.getDate()}`
+            views.publishAttendanceView(app, bot_token, user_id, events, visits, people, date);
           })
-
-          
         })
       })
       .catch(error => {
@@ -100,4 +117,4 @@ function getAttendanceViewDataAndPublishView(client, app, bot_token, user_id, st
   })
 }
 
-module.exports = { getUser, getAuthCode, getAttendanceViewDataAndPublishView };
+module.exports = { getUser, getAuthCode, storePikeCredentials, getAttendanceViewDataAndPublishView };
