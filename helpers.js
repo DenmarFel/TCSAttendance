@@ -98,13 +98,14 @@ function getAttendanceViewDataAndPublishView(client, app, bot_token, user_id, st
           values.forEach(value => {
             visits.push(value.data.visits);
           })
-
+          
           Promise.all(people_promises).then(values => {
             let people = []
             values.forEach(value => {
               people.push(value.data.people);
             })
 
+            // Converts date to YYYY-MM-DD format
             let date = `${start.getFullYear()}-${start.getMonth() + 1}-${start.getDate()}`
             views.publishAttendanceView(app, bot_token, user_id, events, visits, people, date);
           })
@@ -117,4 +118,37 @@ function getAttendanceViewDataAndPublishView(client, app, bot_token, user_id, st
   })
 }
 
-module.exports = { getUser, getAuthCode, storePikeCredentials, getAttendanceViewDataAndPublishView };
+function updateStudentAttendance(app, client, body, context, user, state_event) {
+  const visitIdAndPersonIdAndDate = body.actions[0].value.split('/');
+  const visit_id = visitIdAndPersonIdAndDate[0];
+  const person_id = visitIdAndPersonIdAndDate[1];
+  const date = visitIdAndPersonIdAndDate[2];
+
+  let start = new Date(date);
+  start.setHours(0,0,0,0);
+  start.setDate(start.getDate());
+  start = new Date(start);
+  let end = new Date(date);
+  end.setHours(23,59,59,999);
+  end.setDate(end.getDate());
+  end = new Date(end);
+
+  client.hget('pike13users', user.user.id , (error, access_token) => {
+    if (error) throw error;
+    axios.put(`${process.env.PIKE13_URL}/api/v2/desk/visits/${visit_id}`, {
+      access_token: access_token,
+      visit : {
+        person_id: person_id,
+        state_event: state_event
+      }
+    })
+    .then(response => {
+      getAttendanceViewDataAndPublishView(client, app, context.botToken, user.user.id, start, end);
+    })
+    .catch(error => {
+      console.log(JSON.stringify(error, null, 2));
+    })
+  })
+}
+
+module.exports = { getUser, getAuthCode, storePikeCredentials, getAttendanceViewDataAndPublishView, updateStudentAttendance};

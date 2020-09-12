@@ -52,7 +52,6 @@ app.event('app_home_opened', async ({event, context}) => {
 
 app.action('attendance_on_date', async ({action, ack, body, context}) => {
   await ack();
-  
   try {
     const user = await helpers.getUser(app, process.env.SLACK_BOT_TOKEN, body.user.id);
 
@@ -83,53 +82,20 @@ app.action('attendance_on_date', async ({action, ack, body, context}) => {
 app.action('student_present', async ({ack, body, context}) => {
   await ack();
   try {
-    console.log('Student Present');
     const user = await helpers.getUser(app, process.env.SLACK_BOT_TOKEN, body.user.id);
-    const visitIdAndPersonIdAndDate = body.actions[0].value.split('/');
-    const state_event = 'complete';
-    const visit_id = visitIdAndPersonIdAndDate[0];
-    const person_id = visitIdAndPersonIdAndDate[1];
-    const date = visitIdAndPersonIdAndDate[2];
-
-    let start = new Date(date);
-    start.setHours(0,0,0,0);
-    start.setDate(start.getDate());
-    start = new Date(start);
-    let end = new Date(date);
-    end.setHours(23,59,59,999);
-    end.setDate(end.getDate());
-    end = new Date(end);
-
-    client.hget('pike13users', user.user.id , (error, access_token) => {
-      if (error) throw error;
-      axios.put(`${process.env.PIKE13_URL}/api/v2/desk/visits/${visit_id}`, {
-        access_token: access_token,
-        visit : {
-          person_id: person_id,
-          state_event: state_event
-        }
-      })
-      .then(response => {
-        console.log(response);
-        helpers.getAttendanceViewDataAndPublishView(client, app, context.botToken, user.user.id, start, end);
-      })
-      .catch(error => {
-        console.log(error);
-        console.log(JSON.stringify(error, null, 2));
-      });
-
-    })
+    helpers.updateStudentAttendance(app, client, body, context, user, "complete");
   }
   catch (error) {
     console.log(error);
   }
 })
 
-app.action('student_no_show', async ({ack}) => {
+
+app.action('student_no_show', async ({ack, body, context}) => {
   await ack();
   try {
-    console.log('Student No Show');
-    const state_event = 'noshow';
+    const user = await helpers.getUser(app, process.env.SLACK_BOT_TOKEN, body.user.id);
+    helpers.updateStudentAttendance(app, client, body, context, user, "noshow");
   }
   catch (error) {
     console.log(error);
@@ -139,41 +105,8 @@ app.action('student_no_show', async ({ack}) => {
 app.action('student_reset', async ({ack, body, context}) => {
   await ack();
   try {
-    console.log('Student Present');
     const user = await helpers.getUser(app, process.env.SLACK_BOT_TOKEN, body.user.id);
-    const visitIdAndPersonIdAndDate = body.actions[0].value.split('/');
-    const state_event = 'reset';
-    const visit_id = visitIdAndPersonIdAndDate[0];
-    const person_id = visitIdAndPersonIdAndDate[1];
-    const date = visitIdAndPersonIdAndDate[2];
-
-    let start = new Date(date);
-    start.setHours(0,0,0,0);
-    start.setDate(start.getDate());
-    start = new Date(start);
-    let end = new Date(date);
-    end.setHours(23,59,59,999);
-    end.setDate(end.getDate());
-    end = new Date(end);
-
-    client.hget('pike13users', user.user.id , (error, access_token) => {
-      if (error) throw error;
-      axios.put(`${process.env.PIKE13_URL}/api/v2/desk/visits/${visit_id}`, {
-        access_token: access_token,
-        person_id: person_id,
-        state_event: state_event
-        // visit: `{"state_event": "reset"}`
-      })
-      .then(response => {
-        console.log(response);
-        helpers.getAttendanceViewDataAndPublishView(client, app, context.botToken, user.user.id, start, end);
-      })
-      .catch(error => {
-        console.log(error);
-        console.log(JSON.stringify(error, null, 2));
-      });
-
-    })
+    helpers.updateStudentAttendance(app, client, body, context, user, "reset");
   }
   catch (error) {
     console.log(error);

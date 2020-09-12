@@ -46,12 +46,6 @@ function formatTime(time) {
 }
 
 async function publishAttendanceView(app, slack_token, user_id, events, visits, people, date = getTodaysDate()) {
-  // console.log(JSON.stringify(events, null, 2));
-  // console.log(JSON.stringify(visits, null, 2));
-  // console.log(events);
-  // console.log(visits);
-  // console.log(people);
-  // console.log(date);
   let view = {
     "type": "home",
     "blocks": [
@@ -78,108 +72,117 @@ async function publishAttendanceView(app, slack_token, user_id, events, visits, 
     ]
   }
 
-  events.forEach((event) => {
-    let start = formatTime(new Date(event.start_at).toLocaleTimeString());
-    let end = formatTime(new Date(event.end_at).toLocaleTimeString());
-
-    const event_header = {
+  if (events.length == 0) {
+    let no_events = {
       "type": "section",
       "text": {
         "type": "mrkdwn",
-				"text": `*<${process.env.PIKE13_URL}/e/${event.id}|${event.name} (${start}-${end})>*`,
+        "text": `*No sessions (so far).* Enjoy your day off!`,
       }
     }
-    view.blocks.push(event_header);
+    view.blocks.push(no_events);
+  } else {
+    events.forEach((event) => {
+      let start = formatTime(new Date(event.start_at).toLocaleTimeString());
+      let end = formatTime(new Date(event.end_at).toLocaleTimeString());
 
-    event.people.forEach(person => {
-      let person_providers;
-      people.forEach(person_data => {
-        if (person.id == person_data[0].id) { 
-          person_providers = person_data[0].providers;
-        }
-      })
-
-      let contacts = [];
-      person_providers.forEach(provider => {
-        if (provider.phone) {
-          contacts.push(`${provider.name} (${provider.phone.substring(0,3)}) ${provider.phone.substring(3,6)}-${provider.phone.substring(6,10)}`)
-        } else {
-          constats.push(`${provider.name} _(Unavailable)_`)
-        }
-      }) 
-
-      const student = {
+      const event_header = {
         "type": "section",
         "text": {
           "type": "mrkdwn",
-          "text": `>*Student:* ${person.name}\n>*Guardian:* ${contacts.join(', ')}`,
+          "text": `*<${process.env.PIKE13_URL}/e/${event.id}|${event.name} (${start}-${end})>*`,
         }
       }
-      view.blocks.push(student);
+      view.blocks.push(event_header);
 
-      let person_visit;
-      visits.forEach(visit => {
-        visit.forEach(individual_visit => {
-          if (person.id == individual_visit.person_id && event.id == individual_visit.event_occurrence_id) {
-            person_visit = individual_visit;
-            console.log(JSON.stringify(person_visit, null, 2));
+      event.people.forEach(person => {
+        let person_providers;
+        people.forEach(person_data => {
+          if (person.id == person_data[0].id) { 
+            person_providers = person_data[0].providers;
           }
         })
-      })
-      
-      if (person_visit.completed_at == null && person_visit.noshow_at == null) {
-        buttons = {
-          "type": "actions",
-          "elements": [
-            {
-              "type": "button",
-              "text": {
-                "type": "plain_text",
-                "text": "Present"
-              },
-              "style": "primary",
-              "action_id": "student_present",
-              "value": `${person_visit.id}/${person_visit.person_id}/${date}`
-            },
-            {
-              "type": "button",
-              "text": {
-                "type": "plain_text",
-                "text": "No Show"
-              },
-              "action_id": "student_no_show",
-              "value": `${person_visit.id}/${person_visit.person_id}/${date}`
-            }
-          ]
+
+        let contacts = [];
+        person_providers.forEach(provider => {
+          if (provider.phone) {
+            contacts.push(`${provider.name} (${provider.phone.substring(0,3)}) ${provider.phone.substring(3,6)}-${provider.phone.substring(6,10)}`)
+          } else {
+            constats.push(`${provider.name} _(Unavailable)_`)
+          }
+        }) 
+
+        const student = {
+          "type": "section",
+          "text": {
+            "type": "mrkdwn",
+            "text": `>*Student:* ${person.name}\n>*Guardian:* ${contacts.join(', ')}`,
+          }
         }
-      } else {
-        buttons = {
-          "type": "actions",
-          "elements": [
-            {
-              "type": "button",
-              "text": {
-                "type": "plain_text",
-                "text": "Reset Attendance"
-              },
-              "style": "danger",
-              "action_id": "student_reset",
-              "value": `${person_visit.id}/${person_visit.person_id}/${date}`
+        view.blocks.push(student);
+
+        let person_visit;
+        visits.forEach(visit => {
+          visit.forEach(individual_visit => {
+            if (person.id == individual_visit.person_id && event.id == individual_visit.event_occurrence_id) {
+              person_visit = individual_visit;
             }
-          ]
+          })
+        })
+        
+        if (person_visit.completed_at == null && person_visit.noshow_at == null) {
+          buttons = {
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Present"
+                },
+                "style": "primary",
+                "action_id": "student_present",
+                "value": `${person_visit.id}/${person_visit.person_id}/${date}`
+              },
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "No Show"
+                },
+                "action_id": "student_no_show",
+                "value": `${person_visit.id}/${person_visit.person_id}/${date}`
+              }
+            ]
+          }
+        } else {
+          buttons = {
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Reset Attendance"
+                },
+                "style": "danger",
+                "action_id": "student_reset",
+                "value": `${person_visit.id}/${person_visit.person_id}/${date}`
+              }
+            ]
+          }
         }
+        
+        view.blocks.push(buttons);
+      });
+
+      const divider = {
+        "type": "divider"
       }
-      
-      view.blocks.push(buttons);
-    });
-
-    const divider = {
-      "type": "divider"
-    }
-    view.blocks.push(divider);
-  })
+      view.blocks.push(divider);
+    })
+  }
   
-
   app.client.views.publish({
     token: slack_token,
     user_id: user_id,
