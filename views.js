@@ -45,7 +45,7 @@ function formatTime(time) {
   return time.substring(0, pos).concat(time.substring(pos + 4, time.length).toLowerCase())
 }
 
-async function publishAttendanceView(app, slack_token, user_id, events, visits, people, date = getTodaysDate()) {
+async function publishAttendanceView(app, slack_token, user_id, events, visits, people, notes, date = getTodaysDate()) {
   let view = {
     "type": "home",
     "blocks": [
@@ -83,14 +83,30 @@ async function publishAttendanceView(app, slack_token, user_id, events, visits, 
     view.blocks.push(no_events);
   } else {
     events.forEach((event) => {
-      let start = formatTime(new Date(event.start_at).toLocaleTimeString());
-      let end = formatTime(new Date(event.end_at).toLocaleTimeString());
+      let start = formatTime(new Date(event.start_at).toLocaleTimeString('en-US', {timeZone:'America/Los_Angeles'}));
+      let end = formatTime(new Date(event.end_at).toLocaleTimeString('en-US', {timeZone:'America/Los_Angeles'}));
+
+      let attendance_complete = "";
+      if (event.attendance_complete !== null) {
+        if (event.attendance_complete == true) {
+          attendance_complete = "(Completed)"
+        } else {
+          attendance_complete = "(Incomplete!)"
+        }
+      }
+
+      let event_notes = [];
+      notes.forEach(note => {
+        if (note.event_occurrence_id == event.id) {
+          event_notes.push(note.note);
+        }
+      })
 
       const event_header = {
         "type": "section",
         "text": {
           "type": "mrkdwn",
-          "text": `*<${process.env.PIKE13_URL}/e/${event.id}|${event.name} (${start}-${end})>*`,
+          "text": `*<${process.env.PIKE13_URL}/e/${event.id}|${event.name} (${start}-${end}) - ${attendance_complete}>*\n*Notes:* ${event_notes.join(", ")}`,
         }
       }
       view.blocks.push(event_header);

@@ -34,12 +34,21 @@ app.event('app_home_opened', async ({event, context}) => {
     const user = await helpers.getUser(app, process.env.SLACK_BOT_TOKEN, event.user);
     console.log(`${user.user.real_name} visited ${event.tab}`);
 
+    let start = new Date(new Date().toLocaleString('en-US', {timeZone: "America/Los_Angeles"}));
+    start.setHours(7,0,0,0);
+    start.setDate(start.getDate());
+    start = new Date(start);
+    let end = new Date(new Date().toLocaleString('en-US', {timeZone: "America/Los_Angeles"}));
+    end.setHours(6,59,59,999);
+    end.setDate(end.getDate() + 1);
+    end = new Date(end);
+
     if (event.tab == 'home') {
       // Checks if user has Pike13 login credentials
       client.hexists('pike13users', user.user.id, (error, exists) => {
         if (error) throw error;
         // Case 1: User is verified on Pike => Display attendance view
-        if (exists) { helpers.getAttendanceViewDataAndPublishView(client, app, context.botToken, user.user.id); } 
+        if (exists) { helpers.getAttendanceViewDataAndPublishView(client, app, context.botToken, user.user.id, start, end); } 
         // Case 2: User is verified on Pike => Display attendance view
         else { views.publishLoginView(app, context.botToken, user.user.id); }
       });
@@ -55,13 +64,13 @@ app.action('attendance_on_date', async ({action, ack, body, context}) => {
   try {
     const user = await helpers.getUser(app, process.env.SLACK_BOT_TOKEN, body.user.id);
 
-    console.log(action.selected_date);
+    // console.log(action.selected_date);
     let start = new Date(action.selected_date);
-    start.setHours(0,0,0,0);
-    start.setDate(start.getDate() + 1);
+    start.setHours(7,0,0,0);
+    start.setDate(start.getDate());
     start = new Date(start);
     let end = new Date(action.selected_date);
-    end.setHours(23,59,59,999);
+    end.setHours(6,59,59,999);
     end.setDate(end.getDate() + 1);
     end = new Date(end);
 
@@ -70,7 +79,7 @@ app.action('attendance_on_date', async ({action, ack, body, context}) => {
       if (error) throw error;
       // Case 1: User is verified on Pike => Display attendance view
       if (exists) { helpers.getAttendanceViewDataAndPublishView(client, app, context.botToken, user.user.id, start, end); } 
-      // Case 2: User is verified on Pike => Display attendance view
+      // Case 2: User is not verified on Pike => Display login view
       else { views.publishLoginView(app, context.botToken, user.user.id); }
     });
   }

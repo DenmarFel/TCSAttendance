@@ -1,0 +1,13 @@
+SLACK_BOT_TOKEN=put the slack bot token here
+SLACK_SIGNING_SECRET=put the slack signing secret here
+PORT=ex:1234
+
+REDIS_PORT=the redis port
+REDIS_HOST=the redis host
+REDIS_PASSWORD=the redis password
+
+PIKE13_CLIENT_ID=the pike13 client id
+PIKE13_CLIENT_SECRET=the pike13 client secert
+PIKE13_URL=the pike 13 url
+
+SERVER_URL=your server url

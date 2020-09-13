@@ -69,20 +69,26 @@ function getAttendanceViewDataAndPublishView(client, app, bot_token, user_id, st
 
         // Grabs events from JSON response
         let events = response.data.event_occurrences;
-
+        
         // Sorts events based on start time
         events.sort((a, b) => {
           return new Date(a.start_at).getTime() - new Date(b.start_at).getTime();
         });
-        
+  
         let visit_promises = [];
+        let note_promises = [];
         let people_promises = []
         events.forEach(event => {
           // API Call to grab visit of each event occurrence
           let visit_request = axios.get(`${process.env.PIKE13_URL}/api/v2/desk/event_occurrences/${event.id}/visits`, { params: {
             access_token: access_token,
           }})
-          visit_promises.push(visit_request)
+          visit_promises.push(visit_request);
+
+          let note_request = axios.get(`${process.env.PIKE13_URL}/api/v2/desk/event_occurrences/${event.id}/notes`, { params: {
+            access_token: access_token,
+          }})
+          note_promises.push(note_request);
 
           event.people.forEach(person => {
             // API Call to grab person of each person from each event
@@ -98,16 +104,27 @@ function getAttendanceViewDataAndPublishView(client, app, bot_token, user_id, st
           values.forEach(value => {
             visits.push(value.data.visits);
           })
-          
-          Promise.all(people_promises).then(values => {
-            let people = []
+
+          Promise.all(note_promises).then(values => {
+            let notes = [];
             values.forEach(value => {
-              people.push(value.data.people);
+              value.data.notes.forEach(note => {
+                if (note.public == false) {
+                  notes.push(note);
+                }
+              })
             })
 
-            // Converts date to YYYY-MM-DD format
-            let date = `${start.getFullYear()}-${start.getMonth() + 1}-${start.getDate()}`
-            views.publishAttendanceView(app, bot_token, user_id, events, visits, people, date);
+            Promise.all(people_promises).then(values => {
+              let people = [];
+              values.forEach(value => {
+                people.push(value.data.people);
+              })
+  
+              // Converts date to YYYY-MM-DD format
+              let date = `${start.getFullYear()}-${start.getMonth() + 1}-${start.getDate()}`
+              views.publishAttendanceView(app, bot_token, user_id, events, visits, people, notes, date);
+            })
           })
         })
       })
@@ -125,12 +142,12 @@ function updateStudentAttendance(app, client, body, context, user, state_event) 
   const date = visitIdAndPersonIdAndDate[2];
 
   let start = new Date(date);
-  start.setHours(0,0,0,0);
+  start.setHours(7,0,0,0);
   start.setDate(start.getDate());
   start = new Date(start);
   let end = new Date(date);
-  end.setHours(23,59,59,999);
-  end.setDate(end.getDate());
+  end.setHours(6,59,59,999);
+  end.setDate(end.getDate() + 1);
   end = new Date(end);
 
   client.hget('pike13users', user.user.id , (error, access_token) => {
